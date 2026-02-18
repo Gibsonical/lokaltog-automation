@@ -21,10 +21,13 @@ def run_automation():
 page.fill("input[type='text']", USERNAME)
 page.fill("input[type='password']", PASSWORD)
 
-# Click login button using ID
+# Click login button
 page.click("#btnLogin")
 
 page.wait_for_load_state("networkidle")
+
+# Click the "Tilmeld" button
+page.get_by_role("button", name="Tilmeld").click()
 
             browser.close()
 
