@@ -17,16 +17,14 @@ def run_automation():
             page = browser.new_page()
             page.goto(TARGET_URL)
 
-            # ---- LOGIN SECTION ----
-            page.fill("input[type='text']", USERNAME)
-            page.fill("input[type='password']", PASSWORD)
-            page.click("button[type='submit']")
+# Fill login form
+page.fill("input[type='text']", USERNAME)
+page.fill("input[type='password']", PASSWORD)
 
-            page.wait_for_load_state("networkidle")
+# Click login button using ID
+page.click("#btnLogin")
 
-            # ---- CLICK TARGET BUTTON ----
-            # You will update this selector later once we inspect the page
-            page.click("button#targetButton")
+page.wait_for_load_state("networkidle")
 
             browser.close()
 
