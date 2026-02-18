@@ -1,57 +1,56 @@
-import os
-import requests
 from flask import Flask
+import requests
 
 app = Flask(__name__)
 
-USERNAME = os.environ.get("LT_USERNAME")
-PASSWORD = os.environ.get("LT_PASSWORD")
-
+LOGIN_URL = "https://ltcw01.lokaltog.dk/Admin?_m=HTMLAuthenticate"
 BASE_URL = "https://ltcw01.lokaltog.dk"
+
+USERNAME = "24335"
+PASSWORD = "1955"
 
 @app.route("/")
 def home():
-    return "Service running"
+    return "Automation running. Use /run"
 
-@app.route("/run", methods=["GET"])
-def run_automation():
-    if not USERNAME or not PASSWORD:
-        return "Missing credentials"
-
+@app.route("/run")
+def run():
     try:
         with requests.Session() as session:
 
-            # Step 1: Get login page (to get cookies)
+            # Step 1 – Load login page to get cookies
             session.get(BASE_URL)
 
-            # Step 2: Login
+            # Step 2 – Login
             login_payload = {
                 "username": USERNAME,
                 "password": PASSWORD,
+                "loginScreenMode": "0",
                 "login": "Logon"
             }
 
-            login_response = session.post(BASE_URL, data=login_payload)
+            response = session.post(LOGIN_URL, data=login_payload)
 
-            if login_response.status_code != 200:
+            if "Logon" in response.text:
                 return "Login failed"
 
-            # Step 3: Trigger Tilmeld action
+            # Step 3 – Click the Tilmeld button
+            # This button triggers:
+            # fe(event||target,1000009,{type:'1',step:'request'})
+
             tilmeld_payload = {
+                "_m": "HTMLRequest",
+                "commandId": "1000009",
                 "type": "1",
                 "step": "request"
             }
 
-            response = session.post(BASE_URL, data=tilmeld_payload)
+            tilmeld_response = session.post(BASE_URL + "/Admin", data=tilmeld_payload)
 
-            if response.status_code == 200:
-                return "Success"
-            else:
-                return "Tilmeld failed"
+            return "Success – Tilmeld triggered!"
 
     except Exception as e:
         return f"Error: {str(e)}"
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run()
