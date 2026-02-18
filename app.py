@@ -1,50 +1,57 @@
 import os
+import requests
 from flask import Flask
-from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 
-# Read credentials from Render environment variables
 USERNAME = os.environ.get("LT_USERNAME")
 PASSWORD = os.environ.get("LT_PASSWORD")
 
-TARGET_URL = "https://ltcw01.lokaltog.dk"
+BASE_URL = "https://ltcw01.lokaltog.dk"
+
+@app.route("/")
+def home():
+    return "Service running"
 
 @app.route("/run", methods=["GET"])
 def run_automation():
     if not USERNAME or not PASSWORD:
-        return "Error: Missing environment variables."
+        return "Missing credentials"
 
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"]
-            )
-            page = browser.new_page()
+        with requests.Session() as session:
 
-            # Go to login page
-            page.goto(TARGET_URL, timeout=60000)
+            # Step 1: Get login page (to get cookies)
+            session.get(BASE_URL)
 
-            # Fill login form
-            page.fill("input[type='text']", USERNAME)
-            page.fill("input[type='password']", PASSWORD)
+            # Step 2: Login
+            login_payload = {
+                "username": USERNAME,
+                "password": PASSWORD,
+                "login": "Logon"
+            }
 
-            # Click login button
-            page.click("#btnLogin")
+            login_response = session.post(BASE_URL, data=login_payload)
 
-            # Wait until page fully loads after login
-            page.wait_for_load_state("networkidle")
+            if login_response.status_code != 200:
+                return "Login failed"
 
-            # Wait for Tilmeld button to appear
-            page.wait_for_selector("button:has-text('Tilmeld')", timeout=30000)
+            # Step 3: Trigger Tilmeld action
+            tilmeld_payload = {
+                "type": "1",
+                "step": "request"
+            }
 
-            # Click Tilmeld
-            page.click("button:has-text('Tilmeld')")
+            response = session.post(BASE_URL, data=tilmeld_payload)
 
-            browser.close()
-
-        return "Success"
+            if response.status_code == 200:
+                return "Success"
+            else:
+                return "Tilmeld failed"
 
     except Exception as e:
         return f"Error: {str(e)}"
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
