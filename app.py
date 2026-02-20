@@ -1,73 +1,41 @@
 from flask import Flask
-import requests
-import re
+from playwright.sync_api import sync_playwright
+
+import os
 
 app = Flask(__name__)
 
+USERNAME = os.environ.get("LOKALTOG_USER")
+PASSWORD = os.environ.get("LOKALTOG_PASS")
 BASE_URL = "https://ltcw01.lokaltog.dk"
-LOGIN_URL = BASE_URL + "/Admin?_m=HTMLAuthenticate"
-
-USERNAME = "24335"
-PASSWORD = "1955"
 
 @app.route("/")
 def home():
-    return "Use /run"
+    return "Automation ready. Use /run"
 
 @app.route("/run")
 def run():
-    try:
-        with requests.Session() as session:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-            # 1️⃣ Load login page
-            session.get(BASE_URL)
+        # Go to login page
+        page.goto(f"{BASE_URL}/Admin?_m=HTMLAuthenticate")
 
-            # 2️⃣ Login
-            login_payload = {
-                "username": USERNAME,
-                "password": PASSWORD,
-                "loginScreenMode": "0",
-                "login": "Logon"
-            }
+        # Fill username/password and log in
+        page.fill("#loginName", USERNAME)
+        page.fill("#loginPassword", PASSWORD)
+        page.click("#btnLogin")
 
-            login_response = session.post(LOGIN_URL, data=login_payload)
+        # Wait for admin page to load
+        page.wait_for_load_state("networkidle")
 
-            if "Logon" in login_response.text:
-                return "Login failed"
+        # Click the Tilmeld button
+        page.click(".Cmd_Default")  # this is the Tilmeld button
 
-            # 3️⃣ Load admin page to get dynamic values
-            admin_page = session.get(BASE_URL + "/Admin")
-            html = admin_page.text
+        browser.close()
 
-            # Extract _s value
-            s_match = re.search(r"_s:\s*'([^']+)'", html)
-            pid_match = re.search(r"_pid:\s*'([^']+)'", html)
-
-            if not s_match or not pid_match:
-                return "Could not extract session values"
-
-            s_value = s_match.group(1)
-            pid_value = pid_match.group(1)
-
-            # 4️⃣ Send Tilmeld request
-            tilmeld_payload = {
-                "_evn": "0",
-                "_m": "ProcessRequest",
-                "_s": s_value,
-                "_pid": pid_value,
-                "_evq": "7",
-                "_times": "",
-                "_focus": pid_value,
-                "_fragment": f"{pid_value},attend,0,0",
-                "_evm": "2"
-            }
-
-            response = session.post(BASE_URL + "/Admin", data=tilmeld_payload)
-
-            return "Tilmeld request sent successfully"
-
-    except Exception as e:
-        return f"Error: {str(e)}"
-
+    return "Tilmeld clicked successfully!"
+    
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=8000)
